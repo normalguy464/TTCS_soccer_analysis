@@ -5,51 +5,12 @@ import os
 import sys
 import cv2
 import numpy as np
-import pandas as pd # thêm thư viện này
 sys.path.append('../')
-# from utils import get_center_of_bbox, get_bbox_width
-from utils.bbox_utils import get_center_of_bbox, get_bbox_width, get_foot_position
+from utils import get_center_of_bbox, get_bbox_width
 class Tracker:
     def __init__(self, model_path):
         self.model = YOLO(model_path)  # Load the YOLOv8 model
         self.tracker = sv.ByteTrack()  # Initialize the ByteTracker for tracking
-
-    def add_possition_to_tracks(self, tracks):
-        for object, object_tracks in tracks.items():
-            for frame_num, track in enumerate(object_tracks):
-                for track_id, track_info in track.items():
-                    bbox = track_info["bbox"]
-                    if object == 'ball':
-                        position = get_center_of_bbox(bbox)
-                    else:
-                        position = get_foot_position(bbox)
-                    tracks[object][frame_num][track_id]['position'] = position
-                   
-
-
-    # def interpolate_ball_positions(self, ball_positions):
-    #     ball_positions = [x.get(1,{}).get('bbox',[]) for x in ball_positions]
-    #     df_ball_positions = pd.DataFrame(ball_positions, columns=['x1','y1','x2','y2'])
-        
-    #     # Interpolate missing values
-    #     df_ball_posittions = df_ball_positions.interpolate()
-    #     df_ball_posittions = df_ball_positions.bfill()
-
-    #     ball_positions = [{1:{"bbox": x}} for x in df_ball_posittions.to_numpy().tolist()]
-
-    #     return ball_positions
-
-    def interpolate_ball_positions(self, ball_positions):
-        ball_positions = [x.get(1, {}).get("bbox", []) for x in ball_positions]
-        df_ball_positions = pd.DataFrame(ball_positions, columns=['x1', 'y1', 'x2', 'y2'])
-
-        # Interpolate missing values
-        df_ball_positions = df_ball_positions.interpolate()
-        df_ball_positions = df_ball_positions.bfill().ffill()  # Điền giá trị còn thiếu bằng giá trị gần nhất
-
-        ball_positions = [{1: {"bbox": x}} for x in df_ball_positions.to_numpy().tolist()]
-
-        return ball_positions
 
     def detect_frames(self, frames):
         batch_size = 25  # Set the batch size for processing frames
@@ -161,52 +122,21 @@ class Tracker:
             )
         return frame 
     
-    def draw_triangle(self, frame, bbox, color):
-        if any(np.isnan(bbox)):  # Kiểm tra nếu bất kỳ giá trị nào trong bbox là NaN
-            return frame  # Bỏ qua nếu bbox không hợp lệ
-
-        y = int(bbox[1])
-        x, _ = get_center_of_bbox(bbox)
+    def draw_triangle(self,frame,bbox,color):
+        y= int(bbox[1])
+        x,_ = get_center_of_bbox(bbox)
 
         triangle_points = np.array([
-            [x, y],
-            [x - 10, y - 20],
-            [x + 10, y - 20],
+            [x,y],
+            [x-10,y-20],
+            [x+10,y-20],
         ])
-        cv2.drawContours(frame, [triangle_points], 0, color, cv2.FILLED)
-        cv2.drawContours(frame, [triangle_points], 0, (0, 0, 0), 2)
+        cv2.drawContours(frame, [triangle_points],0,color, cv2.FILLED)
+        cv2.drawContours(frame, [triangle_points],0,(0,0,0), 2)
 
         return frame
 
-    def draw_team_ball_control(self, frame, frame_num, team_ball_control):
-        #deaw a semi-transparent rectangle
-        overlay = frame.copy()
-        cv2.rectangle(overlay, (1350, 850), (1900, 97000), (255,255,255), -1)
-        alpha = 0.4
-        cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
-
-        team_ball_control_till_frame = team_ball_control[:frame_num+1]
-        
-        team_1_num_frams = np.sum(team_ball_control_till_frame == 1)
-        team_2_num_frams = np.sum(team_ball_control_till_frame == 2)
-        total = team_1_num_frams + team_2_num_frams
-
-        # Tránh chia cho 0
-        if total > 0:
-            team_1 = team_1_num_frams / total
-            team_2 = team_2_num_frams / total
-            cv2.putText(frame, f"Team 1 Ball Control: {team_1 * 100:.2f}%", (1400, 900),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
-            cv2.putText(frame, f"Team 2 Ball Control: {team_2 * 100:.2f}%", (1400, 950),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
-        else:
-            cv2.putText(frame, "No ball possession data", (1400, 925),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
-
-        return frame
-
-
-    def draw_annotations(self, video_frames, tracks, team_ball_control):
+    def draw_annotations(self, video_frames, tracks):
         output_video_frames = []
         for frame_num, frame in enumerate(video_frames):
             frame = frame.copy()
@@ -221,10 +151,6 @@ class Tracker:
                 print(f"Player {track_id} team_color:", player.get("team_color"))    
                 color = player.get("team_color")
                 frame = self.draw_ellipse(frame, player["bbox"], color, track_id)
-
-                if player.get('has_ball', False):
-                    frame = self.draw_triangle(frame, player["bbox"], (0,0,255))
-
             #Draw referees
             for track_id, referee in referee_dict.items():
                 frame = self.draw_ellipse(frame, referee["bbox"], (0,255,255), track_id)
@@ -234,9 +160,5 @@ class Tracker:
             #Draw ball
             for track_id, ball in ball_dict.items():
                 frame = self.draw_triangle(frame, ball["bbox"], (0,255,0))
-
-            #Draw team ball control
-            frame = self.draw_team_ball_control(frame, frame_num, team_ball_control)
-
             output_video_frames.append(frame)
         return output_video_frames
