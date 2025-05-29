@@ -18,10 +18,10 @@ class TeamAssigner:
 
     def get_player_color(self, frame, bbox):
         image = frame[int(bbox[1]):int(bbox[3]), int(bbox[0]):int(bbox[2])]
-        top_half_image = image[0:int(image.shape[0]/2), :]
-        kmeans = self.get_clustering_model(top_half_image)
+        # top_half_image = image[0:int(image.shape[0]/2), :]
+        kmeans = self.get_clustering_model(image)
         labels = kmeans.labels_
-        clustered_image = labels.reshape(top_half_image.shape[0], top_half_image.shape[1])
+        clustered_image = labels.reshape(image.shape[0], image.shape[1])
         corner_clusters = [clustered_image[0, 0], clustered_image[0, -1], clustered_image[-1, 0], clustered_image[-1, -1]]
         non_player_cluster = max(set(corner_clusters), key=corner_clusters.count)
         player_cluster = 1 - non_player_cluster

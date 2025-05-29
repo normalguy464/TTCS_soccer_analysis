@@ -22,7 +22,7 @@ class ViewTransformer():
         self.pixel_vertices = self.pixel_vertices.astype(np.float32)
         self.target_vertices = self.target_vertices.astype(np.float32)
 
-        self.persepctive_trasnformer = cv2.getPerspectiveTransform(self.pixel_vertices, self.target_vertices)
+        self.perspective_transformer = cv2.getPerspectiveTransform(self.pixel_vertices, self.target_vertices)
 
     def transform_point(self, point):
         p = (int(point[0]), int(point[1]))
@@ -30,8 +30,8 @@ class ViewTransformer():
         if not is_inside:
             return None
         reshaped_point = point.reshape(-1, 1, 2).astype(np.float32)
-        tranform_point = cv2.perspectiveTransform(reshaped_point, self.persepctive_trasnformer)
-        return tranform_point.reshape(-1, 2)
+        transformed_point = cv2.perspectiveTransform(reshaped_point, self.perspective_transformer)
+        return transformed_point.reshape(-1, 2)
 
     def add_transformed_position_to_tracks(self, tracks):
         for object, object_tracks in tracks.items():
@@ -39,7 +39,7 @@ class ViewTransformer():
                 for track_id, track_info in track.items():
                     position = track_info['position_adjusted']
                     position = np.array(position)
-                    position_trasnformed = self.transform_point(position)
-                    if position_trasnformed is not None:
-                        position_trasnformed = position_trasnformed.squeeze().tolist()
-                    tracks[object][frame_num][track_id]['position_transformed'] = position_trasnformed
+                    position_transformed = self.transform_point(position)
+                    if position_transformed is not None:
+                        position_transformed = position_transformed.squeeze().tolist()
+                    tracks[object][frame_num][track_id]['position_transformed'] = position_transformed

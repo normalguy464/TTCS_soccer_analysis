@@ -33,6 +33,67 @@ class Tracker:
         df_ball_positions = df_ball_positions.bfill().ffill()
         ball_positions = [{1: {"bbox": x}} for x in df_ball_positions.to_numpy().tolist()]
         return ball_positions
+    
+    def interpolate_missing_positions(self, tracks):
+        for object_name, object_tracks in tracks.items():
+            if object_name == 'ball' or object_name == 'referees':
+                continue
+                
+            # Thu thập tất cả track_id
+            all_track_ids = set()
+            for frame_tracks in object_tracks:
+                all_track_ids.update(frame_tracks.keys())
+            
+            # Nội suy cho từng track_id
+            for track_id in all_track_ids:
+                # Tìm tất cả frame có track_id này
+                positions = {}
+                for frame_num, frame_tracks in enumerate(object_tracks):
+                    if track_id in frame_tracks:
+                        pos = (frame_tracks[track_id].get('position_transformed') or
+                            frame_tracks[track_id].get('position_adjusted') or
+                            frame_tracks[track_id].get('position'))
+                        if pos is not None:
+                            positions[frame_num] = pos
+                
+                # Nội suy cho các frame bị thiếu
+                frame_numbers = sorted(positions.keys())
+                if len(frame_numbers) < 2:
+                    continue
+                    
+                for i in range(len(frame_numbers) - 1):
+                    start_frame = frame_numbers[i]
+                    end_frame = frame_numbers[i + 1]
+                    
+                    # Nếu có khoảng trống nhỏ (≤ 10 frames)
+                    if end_frame - start_frame <= 10 and end_frame - start_frame > 1:
+                        start_pos = positions[start_frame]
+                        end_pos = positions[end_frame]
+                        
+                        # Nội suy tuyến tính
+                        for frame_num in range(start_frame + 1, end_frame):
+                            if frame_num < len(object_tracks):
+                                alpha = (frame_num - start_frame) / (end_frame - start_frame)
+                                interpolated_pos = [
+                                    start_pos[0] + alpha * (end_pos[0] - start_pos[0]),
+                                    start_pos[1] + alpha * (end_pos[1] - start_pos[1])
+                                ]
+                                
+                                # Tạo track entry nếu chưa có
+                                if track_id not in object_tracks[frame_num]:
+                                    # Copy từ frame gần nhất
+                                    if track_id in object_tracks[start_frame]:
+                                        object_tracks[frame_num][track_id] = object_tracks[start_frame][track_id].copy()
+                                    else:
+                                        object_tracks[frame_num][track_id] = {}
+                                
+                                # Gán vị trí nội suy
+                                if 'position_transformed' in object_tracks[start_frame][track_id]:
+                                    object_tracks[frame_num][track_id]['position_transformed'] = interpolated_pos
+                                elif 'position_adjusted' in object_tracks[start_frame][track_id]:
+                                    object_tracks[frame_num][track_id]['position_adjusted'] = interpolated_pos
+                                else:
+                                    object_tracks[frame_num][track_id]['position'] = interpolated_pos
 
     def detect_frames(self, frames):
         batch_size = 25

@@ -4,9 +4,10 @@ import yaml
 
 # Thư mục chứa các datasets
 dataset_dirs = [
-    "football-players-detection-1",
+    "football-players-detection-2",
     "football-players-detection-10",
-    "football-players-detection-14"
+    "football-players-detection-14",
+    "football-players-detection-8",
 ]
 
 # Tạo thư mục đầu ra

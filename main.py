@@ -117,26 +117,32 @@ class FootballAnalysisApp:
             self.update_status("Đang đọc video...", 10)
 
             # Đọc video
-            video_frames = read_video(self.video_path)
+            video_frames = read_video(self.video_path, resize_factor=0.5 , batch_size=50)
 
             # Khởi tạo tracker
             self.update_status("Đang khởi tạo bộ theo dõi...", 20)
-            tracker = Tracker('final_model/best.pt')
+            tracker = Tracker('final_model/best_yolov8l_100ep.pt')
 
             # Theo dõi đối tượng
             self.update_status("Đang theo dõi đối tượng...", 30)
-            tracks = tracker.get_object_track(video_frames, read_from_stub=False,
+            try:
+                tracks = tracker.get_object_track(video_frames)
+            except:
+                tracks = tracker.get_object_track(video_frames, read_from_stub=False,
                                                   stub_path='stubs/track_stubs.pkl')
 
             # Xác định vị trí đối tượng
             self.update_status("Đang tính toán vị trí...", 40)
             tracker.add_position_to_tracks(tracks)
+            tracker.interpolate_missing_positions(tracks)  # ← New method
 
             # Ước tính chuyển động camera
             self.update_status("Đang ước tính chuyển động camera...", 50)
             camera_movement_estimator = CameraMovementEstimator(video_frames[0])
-
-            camera_movement_per_frame = camera_movement_estimator.get_camera_movement(
+            try:
+                camera_movement_per_frame = camera_movement_estimator.get_camera_movement(video_frames)
+            except:
+                camera_movement_per_frame = camera_movement_estimator.get_camera_movement(
                     video_frames, read_from_stub=False, stub_path='stubs/camera_movement.pkl')
 
             camera_movement_estimator.add_adjust_position_to_tracks(tracks, camera_movement_per_frame)
@@ -152,6 +158,7 @@ class FootballAnalysisApp:
             # Tính toán tốc độ và khoảng cách
             self.update_status("Đang tính toán tốc độ và khoảng cách...", 70)
             speed_and_distance_estimator = SpeedAndDistanceEstimator()
+            # speed_and_distance_estimator.interpolate_missing_positions(tracks)
             speed_and_distance_estimator.add_speed_and_distance_to_tracks(tracks)
 
             # Phân công đội
@@ -163,9 +170,7 @@ class FootballAnalysisApp:
                 for player_id, track in player_track.items():
                     team = team_assigner.get_player_team(video_frames[frame_num],
                                                          track['bbox'],
-                                                         player_id,
-                                                         is_goalkeeper=track.get('is_goalkeeper',
-                                                                                 False))  # Truyền thông tin thủ môn
+                                                         player_id)
                     tracks['players'][frame_num][player_id]['team'] = team
                     tracks['players'][frame_num][player_id]['team_color'] = team_assigner.team_colors[team]
 
