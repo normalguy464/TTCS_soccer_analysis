@@ -121,7 +121,7 @@ class FootballAnalysisApp:
 
             # Khởi tạo tracker
             self.update_status("Đang khởi tạo bộ theo dõi...", 20)
-            tracker = Tracker('final_model/best.pt')
+            tracker = Tracker('final_model/best_yolov8l_100ep.pt')
 
             # Theo dõi đối tượng
             self.update_status("Đang theo dõi đối tượng...", 30)
